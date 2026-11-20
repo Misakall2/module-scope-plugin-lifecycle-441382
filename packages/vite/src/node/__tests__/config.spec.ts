@@ -2544,4 +2544,20 @@ describe('resolveServerOptions', () => {
       warnFn.mockClear()
     }
   })
+
+  test('defaults strictHostCheck to false and preserves an explicit value', async () => {
+    const defaultResolved = await resolveServerOptions(
+      '/root',
+      { allowedHosts: [] },
+      logger,
+    )
+    expect(defaultResolved.strictHostCheck).toBe(false)
+
+    const strictResolved = await resolveServerOptions(
+      '/root',
+      { allowedHosts: [], strictHostCheck: true },
+      logger,
+    )
+    expect(strictResolved.strictHostCheck).toBe(true)
+  })
 })

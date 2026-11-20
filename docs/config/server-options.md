@@ -60,6 +60,17 @@ Setting `server.allowedHosts` to `true` allows any website to send requests to y
 You can set the environment variable `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` to add additional allowed hosts. Use commas to separate multiple hosts (e.g., `host1.example.com,host2.example.com`).
 :::
 
+## server.strictHostCheck
+
+- **Type:** `boolean`
+- **Default:** `false`
+
+Strictly enforce the resolved [`server.allowedHosts`](#server-allowedhosts) policy at every dev-server entry point. By default, the host check is skipped for regular requests served over HTTPS because plain HTTP DNS rebinding attacks do not apply to TLS connections.
+
+Enable this when the dev server is reached over an encrypted connection on an internal network through explicitly configured hostnames that must still be validated. When enabled, the same resolved host list is applied to both regular HTTPS requests and HMR WebSocket upgrades.
+
+The HMR WebSocket entry always enforces the host policy regardless of this option. This option only additionally applies it to regular requests under HTTPS. Rejected requests are logged with the entry type (`HTTP request` or `HMR WebSocket upgrade`) and the rejection category, without recording the host header or any connection credential.
+
 ## server.port
 
 - **Type:** `number`

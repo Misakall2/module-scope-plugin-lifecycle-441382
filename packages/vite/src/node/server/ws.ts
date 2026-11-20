@@ -21,6 +21,7 @@ import type { ResolvedConfig } from '..'
 import { isObject } from '../utils'
 import type { NormalizedHotChannel, NormalizedHotChannelClient } from './hmr'
 import { normalizeHotChannel } from './hmr'
+import { logHostPolicyRejection } from './middlewares/hostCheck'
 import type { HttpServer } from '.'
 
 /* In Bun, the `ws` module is overridden to hook into the native code. Using the bundled `js` version
@@ -173,10 +174,14 @@ export function createWebSocketServer(
     // this is fine because vite-ping does not receive / send any meaningful data
     if (protocol === 'vite-ping') return true
 
+    // Host policy is enforced before any subscription is created or connection
+    // event is broadcast: a rejected upgrade is aborted by ws and never
+    // reaches handleUpgrade's connection emit.
     if (
       allowedHosts !== true &&
       !isHostAllowed(req.headers.host, allowedHosts)
     ) {
+      logHostPolicyRejection(config.logger, 'ws', 'host')
       return false
     }
 
@@ -188,7 +193,14 @@ export function createWebSocketServer(
     // Browsers always sets the Origin header for WebSocket connections.
     if (req.headers.origin) {
       const parsedUrl = new URL(`http://example.com${req.url!}`)
-      return hasValidToken(config, parsedUrl)
+      // This authorization check is independent from the host policy above.
+      // Passing the host check must never make this check pass, and its
+      // failure keeps its own evidence instead of being reported as a host
+      // rejection. The token itself is never logged.
+      if (!hasValidToken(config, parsedUrl)) {
+        logHostPolicyRejection(config.logger, 'ws', 'token')
+        return false
+      }
     }
 
     // We allow non-browser requests to connect without a token

@@ -164,6 +164,22 @@ export interface ServerOptions extends CommonServerOptions {
         server: HttpServer
       }
   /**
+   * Strictly enforce the resolved `allowedHosts` policy on every dev-server
+   * entry point, including regular requests served over an encrypted (HTTPS)
+   * connection and HMR WebSocket upgrades.
+   *
+   * By default this is disabled and the host check is skipped for HTTPS
+   * requests because plain HTTP DNS rebinding attacks do not apply to TLS.
+   * Enable this when the dev server is reached over TLS on an internal
+   * network through explicitly configured hostnames that must still be
+   * validated. The HMR entry always applies the host policy regardless of
+   * this option; this option only makes the regular-request entry apply it
+   * under HTTPS as well.
+   *
+   * @default false
+   */
+  strictHostCheck?: boolean
+  /**
    * Options for files served via '/\@fs/'.
    */
   fs?: FileSystemServeOptions
@@ -1014,10 +1030,19 @@ export async function _createServer(
   }
 
   // host check (to prevent DNS rebinding attacks)
-  const { allowedHosts } = serverConfig
-  // no need to check for HTTPS as HTTPS is not vulnerable to DNS rebinding attacks
-  if (allowedHosts !== true && !serverConfig.https) {
-    middlewares.use(hostValidationMiddleware(allowedHosts, false))
+  const { allowedHosts, strictHostCheck } = serverConfig
+  // no need to check for HTTPS as HTTPS is not vulnerable to DNS rebinding
+  // attacks, unless strictHostCheck is enabled to enforce the resolved host
+  // policy on encrypted requests as well
+  if (allowedHosts !== true && (strictHostCheck || !serverConfig.https)) {
+    middlewares.use(
+      hostValidationMiddleware(
+        allowedHosts,
+        false,
+        strictHostCheck,
+        config.logger,
+      ),
+    )
   }
 
   // apply configureServer hooks ------------------------------------------------
@@ -1236,6 +1261,7 @@ const _serverConfigDefaults = Object.freeze({
   strictPort: false,
   host: 'localhost',
   allowedHosts: [],
+  strictHostCheck: false,
   https: undefined,
   open: false,
   proxy: undefined,
